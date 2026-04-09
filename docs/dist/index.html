@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Watt About You</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              enedis: {
+                blue: '#132F8D',   // Deep corporate blue (Buttons/Backgrounds)
+                bright: '#1423DC', // UPDATED: Strict Enedis Bright Blue for Highlights
+                title: '#1423DC',  // SEMANTIC: Dedicated color for Typography Titles
+                green: '#95C11F',  // Apple/Bright green (Positive/Dataviz)
+                light: '#F4F6F9',  // Light background
+              }
+            }
+          }
+        }
+      }
+    </script>
+
+<link rel="stylesheet" href="./index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "pigeon-maps": "https://esm.sh/pigeon-maps@0.21.6",
+    "jspdf": "https://esm.sh/jspdf@2.5.1"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/Site_Wattaboutyou/assets/index-ak88YFtp.js"></script>
+</head>
+  <body class="bg-enedis-light text-slate-800">
+    <div id="root"></div>
+</body>
+</html>

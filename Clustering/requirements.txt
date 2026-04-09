@@ -1,0 +1,13 @@
+pandas
+numpy
+requests
+matplotlib
+seaborn
+scipy
+openpyxl
+tqdm
+jenkspy
+sentence-transformers
+scikit-learn
+kmodes
+ipykernel
