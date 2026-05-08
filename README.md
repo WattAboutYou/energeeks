@@ -4,6 +4,8 @@
 
 **Watt About You** permet aux habitants de l'Essonne de comparer la consommation électrique et le Diagnostic de Performance Énergétique (DPE) de leur logement avec des biens aux caractéristiques similaires. Le projet repose sur une pipeline de data science qui collecte, géocode, enrichit et clusterise les données, et sur une application web React qui les restitue de manière interactive.
 
+La plateforme est accesible à l'adresse suivante : https://wattaboutyou.github.io/energeeks/
+
 ---
 
 ## 📁 Structure du projet
