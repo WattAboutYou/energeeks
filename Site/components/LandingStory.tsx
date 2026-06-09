@@ -191,7 +191,7 @@ function ProgressiveForm({ onSubmit }: { onSubmit: (addressId: string) => void }
           <AddressAutocomplete
             department={form.dept}
             city={form.city}
-            defaultQuery={form.city === demoCityInData ? DEMO_ADDRESS_QUERY : undefined}
+            defaultQuery={form.city === DEMO_CITY ? DEMO_ADDRESS_QUERY : undefined}
             onSelect={(id) => setForm((f) => ({ ...f, addressId: id }))}
           />
 
