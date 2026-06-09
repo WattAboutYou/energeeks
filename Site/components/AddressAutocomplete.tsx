@@ -8,11 +8,14 @@ interface AddressAutocompleteProps {
   city: string;
   onSelect: (addressId: string) => void;
   disabled?: boolean;
+  defaultQuery?: string;
 }
 
-const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ department, city, onSelect, disabled }) => {
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<AddressData[]>([]);
+const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ department, city, onSelect, disabled, defaultQuery }) => {
+  const [query, setQuery] = useState(defaultQuery ?? '');
+  const [suggestions, setSuggestions] = useState<AddressData[]>(() =>
+    defaultQuery && defaultQuery.length >= 2 ? searchAddresses(defaultQuery, department, city) : []
+  );
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedDisplay, setSelectedDisplay] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -28,11 +31,11 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({ department, c
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [wrapperRef]);
 
-  // Reset if context changes
+  // Reset if context changes (but preserve defaultQuery)
   useEffect(() => {
-    setQuery('');
+    setQuery(defaultQuery ?? '');
     setSelectedDisplay('');
-    setSuggestions([]);
+    setSuggestions(defaultQuery && defaultQuery.length >= 2 ? searchAddresses(defaultQuery, department, city) : []);
   }, [department, city]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

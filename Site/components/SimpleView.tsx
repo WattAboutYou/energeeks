@@ -1,174 +1,349 @@
-
-import React, { useState } from 'react';
-import { ComparisonMetrics, AddressData, DPEGroup } from '../types';
+import React, { useRef, useEffect, useState } from 'react';
+import { ComparisonMetrics, AddressData, DPEGroup, HouseData } from '../types';
 import AdviceSection from './AdviceSection';
 import HousingMap from './HousingMap';
 
 interface SimpleViewProps {
   metrics: ComparisonMetrics;
   userAddress?: AddressData;
+  houseData: HouseData;
+  onOpenDashboard?: () => void;
 }
 
-const SimpleView: React.FC<SimpleViewProps> = ({ metrics, userAddress }) => {
-  const [activeInfo, setActiveInfo] = useState<'diagnostic' | 'carbon' | null>(null);
-  const diff = Math.round(metrics.differencePercentage);
-  const betterThan = Math.round(metrics.betterThanPercentage);
+const BASE = import.meta.env.BASE_URL;
 
-  let statusColor = 'text-enedis-green';
-  let bgColor = 'bg-enedis-green/5';
-  let message = "Excellente performance énergétique !";
-  
-  if (diff > 25) {
-    statusColor = 'text-red-700';
-    bgColor = 'bg-red-100';
-    message = "Votre consommation est nettement supérieure au profil type.";
-  } else if (diff > 10) {
-    statusColor = 'text-red-600';
-    bgColor = 'bg-red-50';
-    message = "Consommation supérieure à la moyenne du groupe.";
-  } else if (diff > -5) {
-    statusColor = 'text-yellow-600';
-    bgColor = 'bg-yellow-50';
-    message = "Consommation dans la norme du groupe.";
-  } else if (diff > -20) {
-    statusColor = 'text-enedis-green';
-    bgColor = 'bg-enedis-green/5';
-    message = "Bonne maîtrise de vos consommations.";
+function RevealEl({
+  children,
+  className = '',
+  delay = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('is-visible'); obs.unobserve(el); } },
+      { threshold: 0.08 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`reveal ${delay} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function getDpeColors(dpe: string): { bg: string; text: string; border: string } {
+  if (['A', 'B'].includes(dpe)) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+  if (['C', 'D'].includes(dpe)) return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' };
+  if (dpe === 'E') return { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' };
+  return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' };
+}
+
+function getHousingIllustration(clusterLabel?: string): string {
+  if (!clusterLabel) return `${BASE}illustrations/logements/maison-indiv1.png`;
+  const lower = clusterLabel.toLowerCase();
+  if (lower.includes('immeuble') || lower.includes('appartement') || lower.includes('collectif')) {
+    return `${BASE}illustrations/logements/immeuble-style-1.png`;
   }
+  if (lower.includes('garage')) return `${BASE}illustrations/logements/maison-garage.png`;
+  if (lower.includes('moderne')) return `${BASE}illustrations/logements/maison-moderne.png`;
+  if (lower.includes('jumeau') || lower.includes('bande')) return `${BASE}illustrations/logements/maison-indiv2.png`;
+  return `${BASE}illustrations/logements/maison-indiv1.png`;
+}
 
-  // Positioning Gauge Calculations
+function getPositionMessage(betterThan: number): { headline: string; badge: string; badgeColor: string } {
+  if (betterThan >= 75) {
+    return {
+      headline: `Vous consommez moins que ${betterThan}% des logements similaires.`,
+      badge: 'Excellente performance',
+      badgeColor: 'bg-brand-green/20 text-emerald-800 border-brand-green/30',
+    };
+  }
+  if (betterThan >= 50) {
+    return {
+      headline: `Vous consommez moins que ${betterThan}% des logements similaires.`,
+      badge: 'Performance correcte',
+      badgeColor: 'bg-brand-yellow/30 text-yellow-800 border-brand-yellow/40',
+    };
+  }
+  if (betterThan >= 25) {
+    return {
+      headline: `Vous consommez plus que ${100 - betterThan}% des logements similaires.`,
+      badge: "Marge d'amélioration",
+      badgeColor: 'bg-brand-orange/15 text-orange-800 border-brand-orange/30',
+    };
+  }
+  return {
+    headline: `Vous consommez nettement plus que ${100 - betterThan}% des logements similaires.`,
+    badge: 'Consommation élevée',
+    badgeColor: 'bg-red-50 text-red-800 border-red-200',
+  };
+}
+
+const SimpleView: React.FC<SimpleViewProps> = ({ metrics, userAddress, houseData, onOpenDashboard }) => {
+  const betterThan = Math.round(metrics.betterThanPercentage);
+  const { headline, badge, badgeColor } = getPositionMessage(betterThan);
+  const dpeColors = getDpeColors(houseData.dpe);
+
+  // Jauge
   const median = metrics.groupMedian;
   const maxRange = median * 2;
   const userPos = Math.min(100, Math.max(0, (metrics.userConsumption / maxRange) * 100));
+  const [gaugeWidth, setGaugeWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setGaugeWidth(userPos), 200);
+    return () => clearTimeout(t);
+  }, [userPos]);
+
+  // cluster label for illustration
+  const clusterLine = metrics.clusterCharacteristics.find((c) => c.startsWith('Cluster :'));
+  const clusterLabel = clusterLine ? clusterLine.replace('Cluster : ', '') : undefined;
+  const housingIllustration = getHousingIllustration(clusterLabel);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Side-by-Side Top Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Diagnostic Flash Section */}
-        <div 
-          onClick={() => setActiveInfo(activeInfo === 'diagnostic' ? null : 'diagnostic')}
-          className={`flex flex-col p-8 rounded-3xl border ${activeInfo === 'diagnostic' ? 'border-enedis-bright ring-4 ring-enedis-bright/5' : 'border-slate-100'} ${bgColor} text-center shadow-lg shadow-slate-200/20 cursor-pointer transition-all hover:shadow-xl group relative overflow-hidden`}
-        >
-          <div className="absolute top-5 right-5 text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-enedis-bright transition-colors">
-            {activeInfo === 'diagnostic' ? 'Fermer ✕' : 'Comprendre ce chiffre ℹ️'}
-          </div>
-          
-          <h2 className="text-[11px] font-black text-enedis-title uppercase tracking-[0.2em] mb-4">Diagnostic Flash</h2>
-          <div className="flex flex-col items-center justify-center my-4">
-            <span className="text-6xl font-black text-slate-800 tracking-tighter">
-              {betterThan}%
-            </span>
-            <span className="text-[11px] text-slate-500 font-bold mt-3 max-w-[220px]">
-              Vous consommez <span className="text-enedis-blue border-b border-enedis-blue/20">moins que {betterThan}%</span> des logements similaires
-            </span>
-          </div>
-          <p className={`text-sm font-black ${statusColor} mt-4`}>{message}</p>
+    <div className="font-body space-y-0">
 
-          {activeInfo === 'diagnostic' && (
-            <div className="mt-6 p-6 bg-white rounded-2xl border border-enedis-bright/10 text-left animate-fade-in shadow-inner">
-              <h4 className="text-[10px] font-black uppercase text-enedis-bright mb-2">C'est quoi ce pourcentage ?</h4>
-              <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                Ce chiffre représente votre classement parmi <strong>{metrics.totalSimilarHouseholds} foyers</strong> identiques. 
-                <br /><br />
-                Si vous affichez <strong>80%</strong>, cela signifie que vous faites partie des 20% les plus économes : votre facture est inférieure à celle de 80% de vos voisins.
-              </p>
-            </div>
-          )}
+      {/* ── SECTION 1 — Votre positionnement ───────────────────────── */}
+      <section className="rounded-3xl overflow-hidden mb-8 shadow-lg shadow-slate-200/40">
+        {/* Bandeau couleur */}
+        <div className="bg-brand-blue px-8 pt-10 pb-16 text-white">
+          <p className="text-xs font-heading font-600 text-white/60 uppercase tracking-widest mb-4">
+            Votre positionnement
+          </p>
+          <h2 className="font-heading font-700 text-2xl sm:text-3xl lg:text-4xl leading-tight tracking-tight mb-5 max-w-2xl">
+            {headline}
+          </h2>
+          <span className={`inline-flex items-center px-4 py-1.5 rounded-full border text-xs font-heading font-600 uppercase tracking-wide ${badgeColor}`}>
+            {badge}
+          </span>
         </div>
 
-        {/* Carbon Impact Section */}
-        <div 
-          onClick={() => setActiveInfo(activeInfo === 'carbon' ? null : 'carbon')}
-          className={`flex flex-col p-8 rounded-3xl border ${activeInfo === 'carbon' ? 'border-enedis-green ring-4 ring-enedis-green/5' : 'border-slate-100'} bg-white text-center shadow-lg shadow-slate-200/20 cursor-pointer transition-all hover:shadow-xl group relative overflow-hidden`}
-        >
-          <div className="absolute top-5 right-5 text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-enedis-green transition-colors">
-            {activeInfo === 'carbon' ? 'Fermer ✕' : 'Méthode ℹ️'}
-          </div>
-          
-          <h2 className="text-[11px] font-black text-enedis-green uppercase tracking-[0.2em] mb-4">Impact Environnemental</h2>
-          
-          <div className="flex flex-col items-center justify-center my-4">
-            <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black text-slate-800 tracking-tighter">{metrics.co2Tons.toFixed(2)}</span>
-                <span className="text-[10px] font-black text-slate-400 uppercase">tCO₂/an</span>
-            </div>
-            
-            <div className="w-12 h-px bg-slate-100 my-4"></div>
+        {/* Jauge */}
+        <div className="bg-white px-8 pt-8 pb-10">
+          <p className="text-xs font-heading font-600 text-slate-400 uppercase tracking-widest mb-6">
+            Votre position dans le groupe
+          </p>
 
-            <div className="text-center px-4">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <span className="text-2xl">🌳</span>
-                <span className="text-3xl font-black text-enedis-green">{metrics.treesEquivalent}</span>
+          <div className="relative">
+            {/* Labels */}
+            <div className="flex justify-between text-xs font-body text-slate-400 mb-2">
+              <span>0 kWh</span>
+              <span>Médiane : {median.toLocaleString()} kWh</span>
+              <span>{maxRange.toLocaleString()} kWh</span>
+            </div>
+
+            {/* Track */}
+            <div className="relative h-3 rounded-full bg-gradient-to-r from-brand-green via-brand-yellow to-red-400 overflow-visible">
+              {/* Marqueur médiane */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-6 bg-slate-600/40 rounded" />
+
+              {/* Marqueur utilisateur */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 transition-all duration-1000 ease-out"
+                style={{ left: `${gaugeWidth}%`, transform: 'translate(-50%, -50%)' }}
+              >
+                <div className="w-5 h-5 bg-white border-4 border-brand-accent rounded-full shadow-lg shadow-brand-accent/30" />
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">
-                {metrics.treesEquivalent} arbres nécessaires pour compenser votre empreinte annuelle
-              </p>
+            </div>
+
+            {/* Label vous */}
+            <div
+              className="absolute -bottom-8 transition-all duration-1000 ease-out"
+              style={{ left: `${gaugeWidth}%`, transform: 'translateX(-50%)' }}
+            >
+              <span className="whitespace-nowrap text-xs font-heading font-600 text-brand-accent bg-white border border-brand-surface px-2 py-0.5 rounded-lg shadow-sm">
+                Vous — {metrics.userConsumption.toLocaleString()} kWh
+              </span>
             </div>
           </div>
 
-          {activeInfo === 'carbon' && (
-            <div className="mt-6 p-6 bg-enedis-green/5 rounded-2xl border border-enedis-green/10 text-left animate-fade-in shadow-inner">
-              <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                Calculé sur la base de <strong>60g CO₂ / kWh</strong> (mix français - <strong>SOURCE ADEME</strong>) et une capacité d'absorption de <strong>25kg/an</strong> par arbre.
-              </p>
-            </div>
-          )}
+          <p className="text-xs text-slate-400 font-body text-right mt-12">
+            Source : Base ADEME (2024) — traitée par Energeeks
+          </p>
         </div>
-      </div>
+      </section>
 
-      {/* Positionnement Widget (Gauge) */}
-      <div className="bg-white p-10 rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/20">
-        <h2 className="text-sm font-black text-enedis-title uppercase tracking-[0.2em] mb-12">Positionnement</h2>
-        
-        <div className="relative pt-12 pb-16 px-4">
-          <div className="absolute top-4 left-0 text-[11px] font-bold text-slate-400">0 kWh</div>
-          <div className="absolute top-4 right-0 text-[11px] font-bold text-slate-400">{maxRange.toLocaleString()} kWh</div>
-
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-            <span className="text-[11px] font-black text-slate-600 mb-1">Médiane ({median.toLocaleString()} kWh)</span>
-            <div className="h-20 w-px border-l-2 border-dashed border-slate-400"></div>
+      {/* ── SECTION 2 — Pourquoi ce résultat ? ─────────────────────── */}
+      <RevealEl className="bg-white rounded-3xl p-8 sm:p-10 mb-8 border border-brand-surface shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start gap-8">
+          <div className="flex-shrink-0">
+            <img
+              src={`${BASE}illustrations/emma/emma-a-la-solution.png`}
+              alt="Emma explique"
+              className="w-24 h-auto"
+            />
           </div>
+          <div className="flex-1">
+            <p className="text-xs font-heading font-600 text-brand-blue uppercase tracking-widest mb-3">
+              Pourquoi ce résultat ?
+            </p>
+            <h3 className="font-heading font-700 text-xl text-slate-900 mb-3 tracking-tight">
+              Votre logement a été comparé à{' '}
+              <span className="text-brand-blue">{metrics.totalSimilarHouseholds.toLocaleString()} logements</span> similaires.
+            </h3>
+            <p className="text-sm text-slate-600 leading-relaxed mb-6">
+              Pas n'importe lesquels — uniquement ses jumeaux techniques : des logements
+              partageant les mêmes caractéristiques physiques que le vôtre.
+            </p>
 
-          <div className="h-3 w-full rounded-full bg-gradient-to-r from-enedis-green via-yellow-400 to-red-500 shadow-inner"></div>
-
-          <div 
-            className="absolute top-[4.2rem] flex flex-col items-center transition-all duration-1000 ease-out"
-            style={{ left: `${userPos}%`, transform: 'translateX(-50%)' }}
-          >
-            <div className="w-3 h-3 bg-enedis-bright rounded-full border-2 border-white shadow-md mb-2"></div>
-            <div className="bg-enedis-bright text-white px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-enedis-bright/20 whitespace-nowrap">
-              Vous ({metrics.userConsumption.toLocaleString()} kWh)
+            {/* Tags cluster */}
+            <div className="flex flex-wrap gap-2">
+              {metrics.clusterCharacteristics.map((char, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-bg border border-brand-surface rounded-xl text-xs font-body font-500 text-slate-700"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-blue flex-shrink-0" />
+                  {char}
+                </span>
+              ))}
             </div>
           </div>
         </div>
+      </RevealEl>
 
-        <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-4">
-          Source : Base de données DPE ADEME (2024), traitée par Energeeks.
+      {/* ── SECTION 3 — Logements similaires ───────────────────────── */}
+      <RevealEl className="bg-brand-bg rounded-3xl p-8 sm:p-10 mb-8 border border-brand-surface">
+        <div className="flex flex-col sm:flex-row items-center gap-8">
+          <div className="flex-shrink-0">
+            <img
+              src={housingIllustration}
+              alt="Illustration logement similaire"
+              className="w-32 h-auto"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-heading font-600 text-brand-blue uppercase tracking-widest mb-2">
+              Vos logements de référence
+            </p>
+            <h3 className="font-heading font-700 text-xl text-slate-900 mb-2 tracking-tight">
+              {metrics.totalSimilarHouseholds.toLocaleString()} logements vous ressemblent.
+            </h3>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Ces logements partagent les mêmes caractéristiques physiques que le vôtre.
+              C'est ce groupe qui sert de référence pour évaluer votre consommation.
+            </p>
+          </div>
+        </div>
+      </RevealEl>
+
+      {/* ── SECTION 4 — Votre DPE ───────────────────────────────────── */}
+      <RevealEl className="bg-white rounded-3xl p-8 sm:p-10 mb-8 border border-brand-surface shadow-sm">
+        <p className="text-xs font-heading font-600 text-brand-blue uppercase tracking-widest mb-6">
+          Votre DPE
         </p>
-      </div>
+        <div className="flex flex-col sm:flex-row items-center gap-8">
+          {/* Badge DPE */}
+          <div className={`flex-shrink-0 flex flex-col items-center justify-center w-28 h-28 rounded-3xl border-2 ${dpeColors.bg} ${dpeColors.border}`}>
+            <span className={`font-heading font-700 text-5xl leading-none ${dpeColors.text}`}>
+              {houseData.dpe}
+            </span>
+            <span className="text-xs font-heading font-600 text-slate-400 uppercase tracking-wider mt-1">DPE</span>
+          </div>
 
-      {/* Cluster Characteristics Replacement */}
-      <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/20">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-          <span className="text-lg">📋</span> Votre Cluster de comparaison
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {metrics.clusterCharacteristics.map((char, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100/50 hover:bg-white transition-colors group">
-              <span className="w-1.5 h-1.5 rounded-full bg-enedis-bright/40 group-hover:bg-enedis-bright transition-colors"></span>
-              <span className="text-[11px] font-bold text-slate-600 leading-tight">{char}</span>
-            </div>
-          ))}
+          {/* GES + explication */}
+          <div className="flex-1 text-center sm:text-left">
+            {houseData.ges && houseData.ges !== 'N/A' && (
+              <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 bg-brand-bg border border-brand-surface rounded-xl">
+                <span className="text-xs font-heading font-600 text-slate-400 uppercase tracking-wider">GES</span>
+                <span className="font-heading font-700 text-lg text-slate-800">{houseData.ges}</span>
+              </div>
+            )}
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Le DPE évalue la performance énergétique de votre logement.
+              Mais attention : un bon DPE ne garantit pas une faible consommation réelle — vos
+              usages quotidiens jouent également un rôle important.
+            </p>
+            {houseData.numeroDpe && houseData.numeroDpe !== 'N/A' && (
+              <p className="text-xs text-slate-400 font-body mt-3">
+                N° DPE : {houseData.numeroDpe}
+              </p>
+            )}
+          </div>
         </div>
-        <p className="mt-6 text-[10px] text-slate-400 italic font-medium leading-relaxed">
-          * Ces caractéristiques définissent le groupe de <strong>{metrics.totalSimilarHouseholds} logements</strong> auxquels vous êtes comparé pour garantir un résultat pertinent.
-        </p>
-      </div>
+      </RevealEl>
 
-      <HousingMap userAddress={userAddress} />
-      <AdviceSection dpe={metrics.dpeGroup} differencePercentage={metrics.differencePercentage} />
+      {/* ── SECTION 5 — Impact CO2 ──────────────────────────────────── */}
+      <RevealEl className="bg-white rounded-3xl p-8 sm:p-10 mb-8 border border-brand-surface shadow-sm">
+        <p className="text-xs font-heading font-600 text-emerald-600 uppercase tracking-widest mb-6">
+          Impact environnemental
+        </p>
+        <div className="flex flex-col sm:flex-row gap-8 items-center">
+          <div className="text-center flex-1">
+            <span className="font-heading font-700 text-4xl text-slate-900">
+              {metrics.co2Tons.toFixed(2)}
+            </span>
+            <p className="text-xs font-body text-slate-400 uppercase tracking-wider mt-1">tCO₂ / an</p>
+          </div>
+          <div className="w-px h-16 bg-brand-surface hidden sm:block" />
+          <div className="text-center flex-1">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img
+                src={`${BASE}illustrations/icons/icon-photovolataique.png`}
+                alt=""
+                className="w-8 h-auto opacity-70"
+              />
+              <span className="font-heading font-700 text-4xl text-brand-green">
+                {metrics.treesEquivalent}
+              </span>
+            </div>
+            <p className="text-xs font-body text-slate-400 text-center max-w-[180px] mx-auto leading-snug">
+              arbres nécessaires pour compenser votre empreinte annuelle
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400 font-body mt-6 border-t border-brand-surface pt-4">
+          Calcul basé sur 60 g CO₂ / kWh (mix français — source ADEME) et 25 kg / arbre / an.
+        </p>
+      </RevealEl>
+
+      {/* Carte */}
+      <RevealEl className="mb-8">
+        <HousingMap userAddress={userAddress} />
+      </RevealEl>
+
+      {/* ── SECTION 6 — Now Watt ? ──────────────────────────────────── */}
+      <RevealEl>
+        <AdviceSection
+          dpe={metrics.dpeGroup}
+          differencePercentage={metrics.differencePercentage}
+          betterThan={betterThan}
+        />
+      </RevealEl>
+
+      {/* Observatoire CTA */}
+      {onOpenDashboard && (
+        <RevealEl className="mt-8">
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-brand-surface shadow-sm text-center">
+            <p className="text-xs font-heading font-600 text-brand-blue uppercase tracking-widest mb-3">
+              Aller plus loin
+            </p>
+            <h3 className="font-heading font-700 text-xl text-slate-900 mb-3 tracking-tight">
+              Observatoire Territorial
+            </h3>
+            <p className="text-sm text-slate-500 font-body max-w-lg mx-auto mb-6 leading-relaxed">
+              Explorez la cartographie énergétique complète de votre département.
+              Réservé aux professionnels et chercheurs.
+            </p>
+            <button
+              onClick={onOpenDashboard}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-brand-accent text-white font-heading font-600 rounded-2xl shadow-lg shadow-brand-accent/20 hover:bg-brand-blue hover:-translate-y-0.5 transition-all text-sm uppercase tracking-wide"
+            >
+              Accéder à l'Observatoire
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        </RevealEl>
+      )}
     </div>
   );
 };
