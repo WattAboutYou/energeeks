@@ -104,24 +104,18 @@ interface FormState {
 }
 
 const DEMO_DEPT = '91';
-const DEMO_CITY = 'Evry-Courcouronnes';
+const DEMO_CITY = 'Évry-Courcouronnes';
+const DEMO_ADDRESS_ID = '2291E1747972G';
 const DEMO_ADDRESS_QUERY = '12 SQUARE ALBERT EINSTEIN';
 
 function ProgressiveForm({ onSubmit }: { onSubmit: (addressId: string) => void }) {
   const departments = getDepartments();
-  const cities = getCities(DEMO_DEPT);
-
-  // Start at step 1 with dept pre-confirmed, city pre-selected => show address immediately
-  const demoCityInData = cities.find((c) =>
-    c.toLowerCase().replace(/-/g, '').replace(/\s/g, '') ===
-    DEMO_CITY.toLowerCase().replace(/-/g, '').replace(/\s/g, '')
-  ) ?? '';
 
   const [form, setForm] = useState<FormState>({
-    step: demoCityInData ? 2 : 1,
+    step: 2,
     dept: DEMO_DEPT,
-    city: demoCityInData,
-    addressId: '',
+    city: DEMO_CITY,
+    addressId: DEMO_ADDRESS_ID,
   });
 
   const cityRef = useRef<HTMLDivElement>(null);
@@ -614,16 +608,6 @@ const LandingStory: React.FC<LandingStoryProps> = ({ onAddressSelected }) => {
           <RevealEl variant="reveal-blur" delay="delay-200" className="relative max-w-3xl mx-auto">
             <img src={`${BASE}illustrations/logements/tous-les-logements.png`}
               alt="Panel de logements variés en Essonne" className="w-full h-auto opacity-90" />
-            <div className="flex flex-wrap justify-center gap-4 mt-6">
-              <span className="inline-flex items-center gap-2 px-4 py-2 bg-brand-green/15 border border-brand-green/30 rounded-full text-sm font-body font-600 text-emerald-800">
-                <span className="w-2 h-2 rounded-full bg-brand-green inline-block" />
-                Vos jumeaux techniques
-              </span>
-              <span className="inline-flex items-center gap-2 px-4 py-2 bg-brand-surface border border-slate-200 rounded-full text-sm font-body font-600 text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
-                Logements non comparés
-              </span>
-            </div>
           </RevealEl>
 
           <RevealEl variant="reveal" delay="delay-400" className="mt-14 text-center">
